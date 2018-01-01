@@ -76,22 +76,18 @@ public class Processor extends Thread{
 					if (isAvailble > 0){	
 						int buffSize = in.read(buffer);
 						String recievedMsg = new String(buffer, 0, buffSize);							
-						msg = recievedMsg;							
-						//logger.debug(recievedMsg);
-						System.out.println(recievedMsg);
+						msg = recievedMsg;	
 						processData(recievedMsg);							
 						break;
 					}	
 				}
 			    catch (Exception e) {		
-				  //System.out.println("Error: "+e.toString());
 				  logger.fatal("Error: "+e.toString());
 			    }
 			}while(!msg.equals("terminate"));
 			
 		}
 	    catch (Exception e) {		
-		  //System.out.println("Error: "+e.toString());
 		  logger.fatal("Error: "+e.toString());
 	    }
 		
@@ -99,11 +95,8 @@ public class Processor extends Thread{
 
 	
 	private synchronized void  processData(String message){
-		try{
-			
-			String reply = "";
-			//logger.debug("Processing..."+message);		
-			
+		try{		
+				
 			int command = getCommand("command",message);
 			String service = "";
 			String switchIP = "";
@@ -111,14 +104,18 @@ public class Processor extends Thread{
 			
 			String response = "";
 			switch(command){
-			  case 1://stop
+			  case 1://start
 				  service = getAttributeValue("services",message);				
 				  logger.debug("Command:["+command+"] is executing for servic: "+service);
+				  restart(service,1);
+				  response = getStatusMsg(service,command,"Process completed.",0);
+				  sendData(response);
 				  break;
 			    
-			  case 2://start
+			  case 2://stop
 					service = getAttributeValue("services",message);				
 					logger.debug("Command:["+command+"] is executing for servic: "+service);
+					restart(service,2);
 					response = getStatusMsg(service,command,"Process completed.",0);
 					sendData(response);
 				    break;
@@ -171,7 +168,11 @@ public class Processor extends Thread{
 					}
 					response = getStatusMsg(service,103,msg,0);
 					sendData(response);	
-				    break;  
+				    break; 
+			   case 200:
+				   String billing = getAttributeValue("billingName",message);
+				   logger.debug("Got switch installation request for "+billing);
+				   break;
 			   case 800:
 				   	service = getAttributeValue("services",message);
 				   	logger.debug("Command:["+command+"] is executing for service: "+service);
@@ -183,18 +184,14 @@ public class Processor extends Thread{
 			   default:
 				  service = getAttributeValue("services",message);
 				  logger.debug("[D] Command not matched");
-				  sendData(getStatusMsg(service,-1,"UnRecognized Command",0));	
+				  sendData(getStatusMsg(service,command,"UnRecognized Command",0));	
 				  break;
-			}
-			
-			
-			
+			}			
 		}
 	    catch (Exception e) {		
 		  System.out.println("Error: "+e.toString());
 		  logger.fatal("Error: "+e.toString());
-	    }
-		
+	    }		
 	}//
 	
 	public void linuxCommand(String service,int cmd){
@@ -202,7 +199,7 @@ public class Processor extends Thread{
 		String response="";
 		try{
 			Process process = null;
-			logger.debug("Executing: "+cmd);
+			logger.debug("Executing: "+service);
 			process = Runtime.getRuntime().exec(service);
 			Status = showProcessStatus(process);
 			response = getStatusMsg(service,cmd,Status,1);
@@ -213,6 +210,7 @@ public class Processor extends Thread{
 		}
 		
 	}
+	
 	
 	public void restart(String serviceName,int cmd){
 		String Status = "";
@@ -252,44 +250,45 @@ public class Processor extends Thread{
 			else if(serviceName.startsWith("MoneyTransfer")){
 				log  = "MoneyTransfer.log";
 			}
+			String m="";
+			if(cmd==1){
+				m="Starting the service...";
+			}
+			else if(cmd==2){
+				m="Stoping the service...";
+			}
+			else{
+				m="Restarting the service...";
+			}
 			
-			
-			String response = getStatusMsg(serviceName,cmd,"Restarting the service",1);
+			String response = getStatusMsg(serviceName,cmd,m,1);
 			sendData(response);	
 			
 			logger.debug("Executing: "+command);
 			process = Runtime.getRuntime().exec(command);
 			Status = showProcessStatus(process);
-			Thread.sleep(3000);
-			
+			Thread.sleep(3000);			
 			
 			File logFile  = new File("/usr/local/"+serviceName+"/"+log);
 			deleteFile(logFile);
 			
 			logger.debug("S: "+Status);
-			
+			int next=0;
 			if(Status.contains("unrecognized service") || Status.contains("Permission denied")){
 				logger.debug("Got some error: "+Status);
+				
 			}
 			else{
+				next=1;
+				Status = "Shutdown completed";
+			}
+			
+			if(next==1&&(cmd==3||cmd==1)){
 				command = "service  "+serviceName+"  start";
 				logger.debug("Executing: "+command);
 				process = Runtime.getRuntime().exec(command);
-				//Status = showProcessStatus(process);
 				Thread.sleep(5000);				
-				
-				/*
-				for(int i=0;i<keyword.length;i++){
-					Status = readLogStatus(logFile,keyword[i]);				
-					if(!Status.equals("Time out")){
-						break;
-					}
-				}//
-				*/
-				
-				Status = readLogStatus(logFile,keyword);				
-				
-				
+				Status = readLogStatus(logFile,keyword);
 				
 			}//		
 			response = getStatusMsg(serviceName,cmd,Status,1);
@@ -306,7 +305,7 @@ public class Processor extends Thread{
 	public String showProcessStatus(Process process){
 		String msg="No error detected.";
 		try{
-			/*-----------------------------------------------------------------------------------------------*/
+			
 			BufferedReader stdInput  = new BufferedReader(new InputStreamReader(process.getInputStream()));
 			BufferedReader stdError  = new BufferedReader(new InputStreamReader(process.getErrorStream()));
 				 			 			 			
@@ -336,7 +335,7 @@ public class Processor extends Thread{
 	        	msg=sbOutput.toString();
 	        }
 	        
-	        /*-----------------------------------------------------------------------------------------------*/
+	       
 		}
         catch (Exception e){
 			logger.fatal("Process status: "+e.toString());
@@ -399,7 +398,7 @@ public class Processor extends Thread{
 		}
 	}//
 	
-/*--------------------------Replacing cfg file value--------------------------------------------------------*/	
+
 	public String readFile(String fileName){
 		String data = "";
 		
@@ -462,34 +461,30 @@ public class Processor extends Thread{
 		
 		return data;		
     }//
-/*----------------------------------------------------------------------------------*/	
+
 	public String readLogStatus(File logFile, String keyword[]){
 		String status = "Time out";
 		long currentTime = System.currentTimeMillis();
 		int a=0;
-        boolean searchLog = true;
+        boolean running = true;
         
-        while (searchLog){
-        	
+        while (running){        	
         	try{
         		if (logFile.exists()){
         			List <String> lines = FileUtils.readLines(logFile);
         			for (String line : lines){
-        				for(int i=0;i<keyword.length;i++){
-        					
+        				for(int i=0;i<keyword.length;i++){        					
         					if (line.toLowerCase().contains(keyword[i].toLowerCase())){
             					a=1;
-            				}
-        				
+            				}        				
         			      }        				
-        			if(a!=1)
-            			continue;	  
+        			    if(a!=1)
+            			  continue;	  
         			
-        			logger.debug(line);
-        			status = line;
-        			searchLog=false;
-        			break;
-        			
+        			    logger.debug(line);
+        			    status = line;
+        			    running=false;
+        			    break;        			
         			}
         			
         		}
@@ -519,10 +514,9 @@ public class Processor extends Thread{
             
         }
         catch (Exception e) 
-        {
-            // TODO Auto-generated catch block
-        	logger.fatal(e.toString());
-       }        
+        {           
+           logger.fatal(e.toString());
+        }        
         return value;
     }//
 	
@@ -535,10 +529,9 @@ public class Processor extends Thread{
             
         }
         catch (Exception e) 
-        {
-            // TODO Auto-generated catch block
+        {            
             e.printStackTrace();
-       }        
+        }        
         return value;
     }//
 	

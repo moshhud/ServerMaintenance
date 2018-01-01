@@ -6,8 +6,6 @@ import java.io.FileInputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetAddress;
-import java.net.InetSocketAddress;
-//import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.Properties;
@@ -186,8 +184,7 @@ public class Service extends Thread{
 				ServiceQueue.getInstance().push(socketConnection);
 			}
 			else{
-				logger.debug("Got Request from a Invalid IP: "+ipaddress);				
-				//socketConnection.close();
+				logger.debug("Got Request from a Invalid IP: "+ipaddress);
 				sendResponse(socketConnection,"Unauthorized access request.");
 			}
 				

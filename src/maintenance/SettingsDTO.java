@@ -3,8 +3,6 @@ package maintenance;
 public class SettingsDTO {
     
     public static SettingsDTO obSettingsDTO;
- 
-    
     
     String serverlIP;
     int serverPort;    
@@ -89,10 +87,7 @@ public class SettingsDTO {
 
     public void setPassword(String password) {
         this.password = password;
-    }
-    
-    
-    
+    }   
     
     
 }//end of class
